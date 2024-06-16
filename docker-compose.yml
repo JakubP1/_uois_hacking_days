@@ -269,7 +269,7 @@ services:
     environment:
       # link na db mimo stack
       # - POSTGRES_HOST=host.docker.internal:5432
-      - POSTGRES_HOST=postgres_gql_lessons::5432
+      - POSTGRES_HOST=postgres_gql_lessons:5432
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=example
       - POSTGRES_DB=data
