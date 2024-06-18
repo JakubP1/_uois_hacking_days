@@ -1,5 +1,7 @@
 import logging
 import os
+import re
+
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -18,6 +20,19 @@ logging.basicConfig(
     format='%(asctime)s.%(msecs)03d\t%(levelname)s:\t%(message)s', 
     datefmt='%Y-%m-%dT%I:%M:%S')
 
+
+def validate_url(url, variable_name: str) -> None:
+    # https://stackoverflow.com/questions/7160737/how-to-validate-a-url-in-python-malformed-or-not
+    url_regex = re.compile(r'^(?:http|ftp)s?://'  # http:// or https://
+                       r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'  # domain...
+                       r'localhost|'  # localhost...
+                       r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|'  # ...or ipv4
+                       r'\[?[A-F0-9]*:[A-F0-9:]+\]?)'  # ...or ipv6
+                       r'(?::\d+)?'  # optional port
+                       r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+    if not url or not url_regex.fullmatch(url):
+        logging.error(f"Invalid URL format for {variable_name}: {url}")
+        raise ValueError(f"Invalid URL format for {variable_name}")
 
 # region DB setup
 
@@ -105,8 +120,13 @@ from .appindex import createIndexResponse
 
 # from .authenticationMiddleware import BasicAuthenticationMiddleware302, BasicAuthBackend
 from uoishelpers.authenticationMiddleware import BasicAuthenticationMiddleware302, BasicAuthBackend
-JWTPUBLICKEY = os.environ.get("JWTPUBLICKEY", "http://localhost:8000/oauth/publickey")
-JWTRESOLVEUSERPATH = os.environ.get("JWTRESOLVEUSERPATH", "http://localhost:8000/oauth/userinfo")
+JWTPUBLICKEY = os.environ.get("JWTPUBLICKEY", None)
+JWTRESOLVEUSERPATH = os.environ.get("JWTRESOLVEUSERPATH", None)
+assert JWTPUBLICKEY is not None, "JWTPUBLICKEY environment variable must be explicitly defined"
+assert JWTRESOLVEUSERPATH is not None, "JWTRESOLVEUSERPATH environment variable must be explicitly defined"
+validate_url(JWTPUBLICKEY, "JWTPUBLICKEY")
+validate_url(JWTRESOLVEUSERPATH, "JWTRESOLVEUSERPATH")
+
 
 
 from prometheus_fastapi_instrumentator import Instrumentator
