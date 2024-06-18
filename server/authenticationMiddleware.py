@@ -54,16 +54,18 @@ class BasicAuthBackend(AuthenticationBackend):
         # 1. ziskat jwt (cookies authorization nebo header Authorization: Bearer )
         jwtsource = cookies.get("authorization", None)
         if jwtsource is None:
-            jwtsource = headers.get("Authorization", None)
-            if jwtsource is not None:
-                [_, jwtsource] = jwtsource.split("Bearer ")
+            authorization_header = headers.get("Authorization", None)
+            if authorization_header and authorization_header.startswith("Bearer "): # Header can be malformed
+                [_, jwtsource] = authorization_header.split("Bearer ")
             else:
-                #unathorized
-                pass
+                # Unathorized access
+                raise AuthenticationError("Missing or invalid authorization header")
 
-        print('got jwtsource', jwtsource)
-        if jwtsource is None:
-            raise AuthenticationError("missing code")
+        # Each JWT is made up of three segments, each separated by a dot (.)
+        if not jwtsource or not jwtsource.count(".") == 2:
+            raise AuthenticationError("Invalid JWT token")
+
+        logging.info("Got jwtsource")
 
         # 2. ziskat verejny klic (async request to authority)
         publickey = self.publickey
