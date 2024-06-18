@@ -367,6 +367,7 @@ services:
       - 5432:5432
     networks:
       - gql_ug_network
+      - pgadmin_network
 
   ##Hacking days - PostgresDB segmentation
 
@@ -381,6 +382,7 @@ services:
       - 5433:5432
     networks:
       - gql_events_network
+      - pgadmin_network
 
   postgres_gql_forms:
     image: postgres
@@ -393,6 +395,7 @@ services:
       - 5434:5432
     networks:
       - gql_forms_network
+      - pgadmin_network
 
   postgres_gql_facilities:
     image: postgres
@@ -405,6 +408,7 @@ services:
       - 5435:5432
     networks:
       - gql_facilities_network
+      - pgadmin_network
 
   postgres_gql_granting:
     image: postgres
@@ -417,6 +421,7 @@ services:
       - 5436:5432
     networks:
       - gql_granting_network
+      - pgadmin_network
 
   postgres_gql_projects:
     image: postgres
@@ -429,6 +434,7 @@ services:
       - 5437:5432
     networks:
       - gql_projects_network
+      - pgadmin_network
 
   postgres_gql_publications:
     image: postgres
@@ -441,6 +447,7 @@ services:
       - 5438:5432
     networks:
       - gql_publications_network
+      - pgadmin_network
 
   postgres_gql_lessons:
     image: postgres
@@ -453,6 +460,7 @@ services:
       - 5439:5432
     networks:
       - gql_lessons_network
+      - pgadmin_network
 
   postgres_gql_surveys:
     image: postgres
@@ -465,6 +473,7 @@ services:
       - 5440:5432
     networks:
       - gql_surveys_network
+      - pgadmin_network
 
   postgres_credentials:
     image: postgres
@@ -481,6 +490,7 @@ services:
     restart: on-failure:3 # nedojde k restartu pokud je kontejner "unhealthy", maximalne 3 pokusy
     networks:
       - frontend_network
+      - pgadmin_network
 
   pgadmin:
     image: dpage/pgadmin4
@@ -497,17 +507,8 @@ services:
     ports:
       - 31122:80
     networks:
-      - frontend_network
-      - gql_ug_network
-      - gql_events_network
-      - gql_forms_network
-      - gql_facilities_network
-      - gql_granting_network
-      - gql_projects_network
-      - gql_publications_network
-      - gql_lessons_network
-      - gql_surveys_network
-
+      - pgadmin_network
+  
   prometheus:
     image: prom/prometheus
     restart: always
@@ -554,6 +555,8 @@ networks:
   frontend_network:
     driver: bridge
   prometheus_network:
+    driver: bridge
+  pgadmin_network:
     driver: bridge
   gql_ug_network:
     driver: bridge
