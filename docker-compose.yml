@@ -363,8 +363,6 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=example
       - POSTGRES_DB=data
-    ports:
-      - 5432:5432
     networks:
       - gql_ug_network
       - pgadmin_network
@@ -378,8 +376,6 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=example
       - POSTGRES_DB=data
-    ports:
-      - 5433:5432
     networks:
       - gql_events_network
       - pgadmin_network
@@ -391,8 +387,6 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=example
       - POSTGRES_DB=data
-    ports:
-      - 5434:5432
     networks:
       - gql_forms_network
       - pgadmin_network
@@ -404,8 +398,6 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=example
       - POSTGRES_DB=data
-    ports:
-      - 5435:5432
     networks:
       - gql_facilities_network
       - pgadmin_network
@@ -417,8 +409,6 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=example
       - POSTGRES_DB=data
-    ports:
-      - 5436:5432
     networks:
       - gql_granting_network
       - pgadmin_network
@@ -430,8 +420,6 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=example
       - POSTGRES_DB=data
-    ports:
-      - 5437:5432
     networks:
       - gql_projects_network
       - pgadmin_network
@@ -443,8 +431,6 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=example
       - POSTGRES_DB=data
-    ports:
-      - 5438:5432
     networks:
       - gql_publications_network
       - pgadmin_network
@@ -456,8 +442,6 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=example
       - POSTGRES_DB=data
-    ports:
-      - 5439:5432
     networks:
       - gql_lessons_network
       - pgadmin_network
@@ -469,8 +453,6 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=example
       - POSTGRES_DB=data
-    ports:
-      - 5440:5432
     networks:
       - gql_surveys_network
       - pgadmin_network
@@ -504,8 +486,6 @@ services:
       interval: 60s
       timeout: 10s
       retries: 5
-    ports:
-      - 31122:80
     networks:
       - pgadmin_network
   
@@ -520,8 +500,6 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
-    ports:
-      - 9090:9090
     networks:
       - frontend_network
       - prometheus_network
@@ -542,8 +520,6 @@ services:
     #   - ./grafana/provisioning/:/etc/grafana/provisioning/
     # env_file:
     #   - ./grafana/config.monitoring
-    ports:
-      - 8300:3000
     networks:
       - prometheus_network
     depends_on:
