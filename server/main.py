@@ -252,8 +252,26 @@ async def hello(requets: Request):
     print(f"have pktext={pktext}")
     logging.info(f"have pktext={pktext}")
     pkey = pktext.replace('"', "").replace("\\n", "\n")
-    jwtdecoded = jwt.decode(jwt=token, key=pkey, algorithms=["RS256"])
-    print(f"jwtdecoded = {jwtdecoded}")
+
+    #jwtdecoded = jwt.decode(jwt=token, key=pkey, algorithms=["RS256"])
+    #print(f"jwtdecoded = {jwtdecoded}")
+    try: 
+        jwtdecoded = jwt.decode(jwt=token, key=pkey, algorithms=["RS256"]) 
+        #Process the decoded jtw payload 
+        print("Decoded jwt payload: ", jwtdecoded) 
+
+    except jwt.ExpiredSignatureError: 
+        #Handle expired token 
+        print("JWT expired. Please obtain a new token.") 
+    
+    except jwt.InvalidTokenError as e: 
+        #Handle other JWT validation errors 
+        print("Invalid JWT:", str(e)) 
+
+    except Exception as e: 
+        #Handle any other unexpected exceptions 
+        print("Error decoding JWT:", str(e)) 
+    
     logging.info(f"jwtdecoded = {jwtdecoded}")
     userid = jwtdecoded["user_id"]
     print(f"userid = {userid}")
