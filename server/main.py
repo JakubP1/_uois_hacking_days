@@ -7,6 +7,8 @@ from fastapi.responses import FileResponse, RedirectResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from contextlib import asynccontextmanager
 
+from settings import CHARACTER_ENCODING 
+
 from mockoauthserver import server as OAuthServer
 
 from .users import (
@@ -14,6 +16,31 @@ from .users import (
     startEngine, initDB, 
     getDemoData, passwordValidator, emailMapper
 )
+
+"""
+ENCODING FUNCTION
+"""
+def process_data(input_data): 
+    encoded_data = encode_to_utf8(input_data) 
+    return encoded_data 
+
+    # Function to encode to UTF-8 
+def encode_to_utf8(data): 
+    """ 
+    Encodes input data to UTF-8. 
+    
+    Parameters: 
+    - data: str or bytes. Input data to encode. 
+
+    Returns: 
+    - bytes: Encoded data in UTF-8. 
+    """ 
+    if isinstance(data, str): 
+        return data.encode(CHARACTER_ENCODING) 
+    elif isinstance(data, bytes): 
+        return data     # Already bytes, assuming it's UTF-8 
+    else: 
+        raise TypeError("Expected input of type str or bytes.") 
 
 logging.basicConfig(
     level=logging.INFO, 
@@ -167,7 +194,8 @@ def createApp(key, setup):
         subApp.add_middleware(BasicAuthenticationMiddleware302, backend=BasicAuthBackend(JWTPUBLICKEY=JWTPUBLICKEY, JWTRESOLVEUSERPATH=JWTRESOLVEUSERPATH))
     app.mount("/" + key, subApp)
 
-with open(configFile, "r", encoding="utf-8") as f:
+#with open(configFile, "r", encoding="utf-8") as f:
+with open(configFile, "r", process_data(configFile)) as f:
     config = json.load(f)
     print(f"app config set to\n{config}")
     for key, setup in config.items():

@@ -13,6 +13,8 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from uoishelpers.dataloaders import createIdLoader
 from starlette.authentication import AuthenticationError
 
+from main import process_data
+
 BaseModel = declarative_base()
 
 class UserModel(BaseModel):
@@ -36,7 +38,7 @@ def ComposeConnectionString():
 
     return connectionstring
 
-async def startEngine(connectionstring, makeDrop=False, makeUp=True):
+#async def startEngine(connectionstring, makeDrop=False, makeUp=True):
     """Provede nezbytne ukony a vrati asynchronni SessionMaker"""
     asyncEngine = create_async_engine(connectionstring)
 
@@ -58,18 +60,76 @@ async def startEngine(connectionstring, makeDrop=False, makeUp=True):
     )
     return async_sessionMaker
 
-def createLoader(asyncSessionMaker):
+async def create_tables(engine):
+    async_session = sessionmaker(
+        bind=engine,
+        class_=AsyncSession,
+        expire_on_commit=False
+    )
+    async with async_session() as session:
+        async with session.begin():
+            try:
+                await session.run_sync(BaseModel.metadata.create_all)
+                logging.info("BaseModel.metadata.create_all finished")
+            except sqlalchemy.exc.NoReferencedTableError as e:
+                logging.error(e)
+                logging.error("Unable to automatically create tables")
+                return None
+            except Exception as e:
+                logging.error(f"An unexpected error occurred: {e}")
+                return None
+            finally:
+                await session.close()
+
+async def start_engine(connectionstring, makeDrop=False, makeUp=True):
+    """Provede nezbytne ukony a vrati asynchronni SessionMaker"""
+    asyncEngine = create_async_engine(connectionstring)
+
+    async with asyncEngine.begin() as conn:
+        if makeDrop:
+            await conn.run_sync(BaseModel.metadata.drop_all)
+            logging.info("BaseModel.metadata.drop_all finished")
+        if makeUp:
+            if await create_tables(asyncEngine) is None:
+                return None
+
+    async_sessionMaker = sessionmaker(
+        asyncEngine, expire_on_commit=False, class_=AsyncSession
+    )
+    return async_sessionMaker
+
+def create_loader(asyncSessionMaker):
     return createIdLoader(asyncSessionMaker, UserModel)
 
 @cache
 def getsalt():
     result = os.environ.get("SALT", None)
     assert result is not None, "SALT environment variable must be explicitly defined"
-    return result.encode(encoding="utf-8")
+    #return result.encode(encoding="utf-8")
+    return process_data(result)
 
-def hashfunction(value= " "):
-    result = hashlib.pbkdf2_hmac('sha256', value.encode('utf-8'), getsalt(), 100000)    
-    return result.hex()
+#def hashfunction(value= " "):
+#    result = hashlib.pbkdf2_hmac('sha256', value.encode('utf-8'), getsalt(), 100000)    
+#    return result.hex()
+
+def hashfunction(value=None): 
+    """ 
+    Hashes the provided value using PBKDF2-HMAC-SHA256. 
+
+    Parameters: 
+    - value: str. Input value to hash. Must not be None. 
+
+    Returns: 
+    - str: Hexadecimal representation of the hashed value. 
+
+    Raises: 
+    - ValueError: If no value is provided. 
+    """ 
+    if value is None: 
+        raise ValueError("A value must be provided for hashing. Please provide a password.") 
+
+    result = hashlib.pbkdf2_hmac('sha256', value.encode('utf-8'), getsalt(), 100000) 
+    return result.hex() 
 
 async def passwordValidator(asyncSessionMaker, email, rawpassword) -> bool:
     EMAIL_REGEX = re.compile(r'([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\.[A-Z|a-z]{2,})+')
@@ -108,8 +168,13 @@ async def emailMapper(asyncSessionMaker, email):
     return None if row is None else row.id
 
 def getDemoData():
-    with open("./systemdata.json", "r", encoding="utf-8") as f:
+    #with open("./systemdata.json", "r", encoding="utf-8") as f:
+    #   jsonData = json.load(f)
+    #return jsonData
+
+    with open("./systemdata.json", "r") as f:
         jsonData = json.load(f)
+        process_data(jsonData)
     return jsonData
 
 async def initDB(asyncSessionMaker):
