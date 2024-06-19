@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import hashlib
 import json
@@ -10,6 +11,7 @@ from sqlalchemy import Column, Uuid, String, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from uoishelpers.dataloaders import createIdLoader
+from starlette.authentication import AuthenticationError
 
 BaseModel = declarative_base()
 
@@ -69,13 +71,35 @@ def hashfunction(value= " "):
     result = hashlib.pbkdf2_hmac('sha256', value.encode('utf-8'), getsalt(), 100000)    
     return result.hex()
 
-async def passwordValidator(asyncSessionMaker, email, rawpassword):
-    loader = createLoader(asyncSessionMaker)
+async def passwordValidator(asyncSessionMaker, email, rawpassword) -> bool:
+    EMAIL_REGEX = re.compile(r'([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\.[A-Z|a-z]{2,})+')
+    # Validate email format
+    if not re.fullmatch(EMAIL_REGEX, email):
+        logging.warning(f"Invalid email format: {email}")
+        raise AuthenticationError("Invalid email format")
+
+    # Input validation for password
+    if not rawpassword:
+        logging.warning("No password provided")
+        raise AuthenticationError("No password provided")
+
     hashedpassword = hashfunction(rawpassword)
+
+    loader = createLoader(asyncSessionMaker)
     rows = await loader.filter_by(email=email)
     row = next(rows, None)
     logging.info(f"passwordValidator loader returns {row} for email {email}")
-    return False if row is None else row.password == hashedpassword
+
+    # Output validation result
+    if row is None:
+        logging.warning(f"No user found with email: {email}")
+        return False
+
+    is_valid = row.password == hashedpassword
+    if not is_valid:
+        logging.warning(f"Invalid password for user {email}")
+
+    return is_valid
 
 async def emailMapper(asyncSessionMaker, email):
     loader = createLoader(asyncSessionMaker)
