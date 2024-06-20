@@ -1,0 +1,116 @@
+# gql-ug-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gql-ug
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gql-ug
+  template:
+    metadata:
+      labels:
+        app: gql-ug
+    spec:
+      containers:
+      - name: gql-ug
+        image: hrbolek/gql_ug
+        ports:
+        - containerPort: 8000
+        env:
+        - name: POSTGRES_HOST
+          value: "postgres-gql:5432"
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_PASSWORD
+          value: "example"
+        - name: POSTGRES_DB
+          value: "data"
+        - name: JWTPUBLICKEYURL
+          value: "http://frontend:8000/oauth/publickey"
+        - name: JWTRESOLVEUSERPATHURL
+          value: "http://frontend:8000/oauth/userinfo"
+        - name: DEMO
+          value: "False"
+        - name: DEMODATA
+          value: "True"
+        readinessProbe:
+          httpGet:
+            path: /gql
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 60
+          timeoutSeconds: 10
+          failureThreshold: 3
+        restartPolicy: OnFailure
+
+---
+
+# gql-ug-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: gql-ug
+spec:
+  selector:
+    app: gql-ug
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+  type: NodePort
+
+
+# postgres-gql-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-gql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-gql
+  template:
+    metadata:
+      labels:
+        app: postgres-gql
+    spec:
+      containers:
+      - name: postgres-gql
+        image: postgres
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_PASSWORD
+          value: "example"
+        - name: POSTGRES_DB
+          value: "data"
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+          initialDelaySeconds: 60
+          periodSeconds: 60
+          timeoutSeconds: 10
+          failureThreshold: 3
+        restartPolicy: OnFailure
+
+---
+
+# postgres-gql-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-gql
+spec:
+  selector:
+    app: postgres-gql
+  ports:
+  - protocol: TCP
+    port: 5432
+    targetPort: 5432
+  type: NodePort
