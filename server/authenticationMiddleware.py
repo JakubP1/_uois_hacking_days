@@ -25,20 +25,25 @@ class BasicAuthBackend(AuthenticationBackend):
 
     async def getPublicKey(self):
         async with aiohttp.ClientSession() as session:
-            async with session.get(self.JWTPUBLICKEY) as resp:
-                print(resp.status)
-                if resp.status != 200:
-                    raise AuthenticationError("Public key not available")
+            try:
+                async with session.get(self.JWTPUBLICKEY) as resp:
+                    if resp.status != 200:
+                        logging.error(f"Failed to retrieve public key: HTTP status {resp.status}")
+                        raise AuthenticationError("Public key not available")
 
-                # publickey = await resp.read()
-                publickey = await resp.text()
-        self.publickey = publickey.replace('"', '').replace('\\n', '\n')
-        print('got key', self.publickey)
-        self.publickey = self.publickey.encode()
+                    # publickey = await resp.read()
+                    publickey = await resp.text()
+            except Exception as e:
+                logging.error(f"Exception while retrieving public key: {str(e)}")
+                raise AuthenticationError(f"Failed to retrieve public key: {str(e)}")
+
+        self.publickey = publickey.replace('"', '').replace('\\n', '\n').encode()
+        logging.info(f"Got public key successfully: {self.publickey}")
         return self.publickey
 
     async def authenticate(self, conn):
-        print("# BEGIN #######################################")
+        #print("# BEGIN #######################################")
+        logging.info("Authenticating")
         client = conn.client
         headers = conn.headers
         cookies = conn.cookies
@@ -54,16 +59,20 @@ class BasicAuthBackend(AuthenticationBackend):
         # 1. ziskat jwt (cookies authorization nebo header Authorization: Bearer )
         jwtsource = cookies.get("authorization", None)
         if jwtsource is None:
-            jwtsource = headers.get("Authorization", None)
-            if jwtsource is not None:
-                [_, jwtsource] = jwtsource.split("Bearer ")
+            authorization_header = headers.get("Authorization", None)
+            if authorization_header and authorization_header.startswith("Bearer "): # Header can be malformed
+                [_, jwtsource] = authorization_header.split("Bearer ")
             else:
-                #unathorized
-                pass
+                # Unathorized access
+                logging.warning("Missing or invalid authorization header")
+                raise AuthenticationError("Missing or invalid authorization header")
 
-        print('got jwtsource', jwtsource)
-        if jwtsource is None:
-            raise AuthenticationError("missing code")
+        # Each JWT is made up of three segments, each separated by a dot (.)
+        if not jwtsource or not jwtsource.count(".") == 2:
+            logging.warning("Invalid JWT token format")
+            raise AuthenticationError("Invalid JWT token")
+
+        logging.info("JWT token retrieved")
 
         # 2. ziskat verejny klic (async request to authority)
         publickey = self.publickey
@@ -74,8 +83,10 @@ class BasicAuthBackend(AuthenticationBackend):
         for i in range(2):
             try:
                 jwtdecoded = jwt.decode(jwt=jwtsource, key=publickey, algorithms=["RS256"])
+                logging.info("JWT token successfully decoded")
                 break
             except jwt.InvalidSignatureError as e:
+                logging.error("Invalid JWT signature, attempting to refresh public key")
                 # je mozne ulozit key do cache a pri chybe si key ziskat (obnovit) a provest revalidaci
                 print(e)
             if (i == 1):
@@ -84,7 +95,8 @@ class BasicAuthBackend(AuthenticationBackend):
             
             # aktualizace klice, predchozi selhal
             publickey = await self.getPublicKey()
-            print('publickey refreshed', publickey)
+            #print('publickey refreshed', publickey)
+            logging.info("Public key refreshed")
         
         print('got jwtdecoded', jwtdecoded)
 
@@ -97,9 +109,11 @@ class BasicAuthBackend(AuthenticationBackend):
             async with aiohttp.ClientSession() as session:
                 headers = {"Authorization": f"Bearer {jwtdecoded['access_token']}"}
                 async with session.get(self.JWTRESOLVEUSERPATH, headers=headers) as resp:
-                    print(resp.status)
-                    assert resp.status == 200
+                    if resp.status != 200:
+                        logging.error(f"Failed to resolve user: HTTP status {resp.status}")
+                        raise AuthenticationError("Failed to resolve user")
                     userinfo = await resp.json()
+                    user_id = userinfo("user", {}).get("id", None)
                     print("got userinfo", userinfo)
                     print("got userinfo", userinfo["user"])
 
@@ -108,7 +122,8 @@ class BasicAuthBackend(AuthenticationBackend):
         if user_id is None:
             user["id"] = user_id
             
-        print("# SUCCESS #######################################")
+        #print("# SUCCESS #######################################")
+        logging.info("Authentication successful")
         return AuthCredentials(["authenticated"]), user
     
 from starlette.requests import HTTPConnection
@@ -118,6 +133,7 @@ class BasicAuthenticationMiddleware302(AuthenticationMiddleware):
     @staticmethod
     def default_on_error(conn: HTTPConnection, exc: Exception) -> Response:
         where = conn.url.path
+        logging.error(f"Authentication error on {where}: {str(exc)}")
         result = RedirectResponse(f"/oauth/login2?redirect_uri={where}", status_code=302)
         result.delete_cookie("authorization")
         return result
@@ -126,6 +142,7 @@ class BasicAuthenticationMiddleware404(AuthenticationMiddleware):
     @staticmethod
     def default_on_error(conn: HTTPConnection, exc: Exception) -> Response:
         where = conn.url.path
+        logging.error(f"Authentication error on {where}: {str(exc)}")
         result = PlainTextResponse(f"Unauthorized for {where}", status_code=404)
         result.delete_cookie("authorization")
         return result

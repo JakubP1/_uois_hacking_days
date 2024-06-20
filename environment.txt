@@ -1,3 +1,5 @@
 DEMO=False
 GQL_PROXY=http://localhost:33001/
 SALT=fe1c71b2-74c0-41e5-978f-eecbffac7418
+JWTPUBLICKEY=http://localhost:8000/oauth/publickey
+JWTRESOLVEUSERPATH=http://localhost:8000/oauth/userinfo

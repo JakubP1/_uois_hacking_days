@@ -2,12 +2,15 @@ import json
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 
+from main import process_data
+
 def loadMD(relativeFileName):
     from .main import dirName
     fullName = dirName + "/htmls/" + relativeFileName
     lines = []
     try:
-        with open(fullName, "r", encoding="utf-8") as f:
+        #with open(fullName, "r", encoding="utf-8") as f:
+        with open(fullName, "r", process_data(fullName)) as f:
             lines = f.readlines()
     except:
         pass
@@ -28,7 +31,8 @@ def createCard(link, data):
 async def createIndexResponse(request: Request):
     from .main import configFile
     body = ""
-    with open(configFile, "r", encoding="utf-8") as f:
+    #with open(configFile, "r", encoding="utf-8") as f:
+    with open(configFile, "r", process_data(configFile)) as f:
         config = json.load(f)
         for key, value in config.items():
             body = body + f'<div class="col col-md-3">{createCard(key, value)}</div>'

@@ -1,9 +1,13 @@
 import logging
 import os
+import re
+
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from contextlib import asynccontextmanager
+
+from settings import CHARACTER_ENCODING 
 
 from mockoauthserver import server as OAuthServer
 
@@ -13,11 +17,49 @@ from .users import (
     getDemoData, passwordValidator, emailMapper
 )
 
+"""
+ENCODING FUNCTION
+"""
+def process_data(input_data): 
+    encoded_data = encode_to_utf8(input_data) 
+    return encoded_data 
+
+    # Function to encode to UTF-8 
+def encode_to_utf8(data): 
+    """ 
+    Encodes input data to UTF-8. 
+    
+    Parameters: 
+    - data: str or bytes. Input data to encode. 
+
+    Returns: 
+    - bytes: Encoded data in UTF-8. 
+    """ 
+    if isinstance(data, str): 
+        return data.encode(CHARACTER_ENCODING) 
+    elif isinstance(data, bytes): 
+        return data     # Already bytes, assuming it's UTF-8 
+    else: 
+        raise TypeError("Expected input of type str or bytes.") 
+
 logging.basicConfig(
     level=logging.INFO, 
     format='%(asctime)s.%(msecs)03d\t%(levelname)s:\t%(message)s', 
     datefmt='%Y-%m-%dT%I:%M:%S')
 
+
+def validate_url(url, variable_name: str) -> None:
+    # https://stackoverflow.com/questions/7160737/how-to-validate-a-url-in-python-malformed-or-not
+    url_regex = re.compile(r'^(?:http|ftp)s?://'  # http:// or https://
+                       r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'  # domain...
+                       r'localhost|'  # localhost...
+                       r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|'  # ...or ipv4
+                       r'\[?[A-F0-9]*:[A-F0-9:]+\]?)'  # ...or ipv6
+                       r'(?::\d+)?'  # optional port
+                       r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+    if not url or not url_regex.fullmatch(url):
+        logging.error(f"Invalid URL format for {variable_name}: {url}")
+        raise ValueError(f"Invalid URL format for {variable_name}")
 
 # region DB setup
 
@@ -105,8 +147,13 @@ from .appindex import createIndexResponse
 
 # from .authenticationMiddleware import BasicAuthenticationMiddleware302, BasicAuthBackend
 from uoishelpers.authenticationMiddleware import BasicAuthenticationMiddleware302, BasicAuthBackend
-JWTPUBLICKEY = os.environ.get("JWTPUBLICKEY", "http://localhost:8000/oauth/publickey")
-JWTRESOLVEUSERPATH = os.environ.get("JWTRESOLVEUSERPATH", "http://localhost:8000/oauth/userinfo")
+JWTPUBLICKEY = os.environ.get("JWTPUBLICKEY", None)
+JWTRESOLVEUSERPATH = os.environ.get("JWTRESOLVEUSERPATH", None)
+assert JWTPUBLICKEY is not None, "JWTPUBLICKEY environment variable must be explicitly defined"
+assert JWTRESOLVEUSERPATH is not None, "JWTRESOLVEUSERPATH environment variable must be explicitly defined"
+validate_url(JWTPUBLICKEY, "JWTPUBLICKEY")
+validate_url(JWTRESOLVEUSERPATH, "JWTRESOLVEUSERPATH")
+
 
 
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -147,7 +194,8 @@ def createApp(key, setup):
         subApp.add_middleware(BasicAuthenticationMiddleware302, backend=BasicAuthBackend(JWTPUBLICKEY=JWTPUBLICKEY, JWTRESOLVEUSERPATH=JWTRESOLVEUSERPATH))
     app.mount("/" + key, subApp)
 
-with open(configFile, "r", encoding="utf-8") as f:
+#with open(configFile, "r", encoding="utf-8") as f:
+with open(configFile, "r", process_data(configFile)) as f:
     config = json.load(f)
     print(f"app config set to\n{config}")
     for key, setup in config.items():
@@ -232,8 +280,26 @@ async def hello(requets: Request):
     print(f"have pktext={pktext}")
     logging.info(f"have pktext={pktext}")
     pkey = pktext.replace('"', "").replace("\\n", "\n")
-    jwtdecoded = jwt.decode(jwt=token, key=pkey, algorithms=["RS256"])
-    print(f"jwtdecoded = {jwtdecoded}")
+
+    #jwtdecoded = jwt.decode(jwt=token, key=pkey, algorithms=["RS256"])
+    #print(f"jwtdecoded = {jwtdecoded}")
+    try: 
+        jwtdecoded = jwt.decode(jwt=token, key=pkey, algorithms=["RS256"]) 
+        #Process the decoded jtw payload 
+        print("Decoded jwt payload: ", jwtdecoded) 
+
+    except jwt.ExpiredSignatureError: 
+        #Handle expired token 
+        print("JWT expired. Please obtain a new token.") 
+    
+    except jwt.InvalidTokenError as e: 
+        #Handle other JWT validation errors 
+        print("Invalid JWT:", str(e)) 
+
+    except Exception as e: 
+        #Handle any other unexpected exceptions 
+        print("Error decoding JWT:", str(e)) 
+    
     logging.info(f"jwtdecoded = {jwtdecoded}")
     userid = jwtdecoded["user_id"]
     print(f"userid = {userid}")
